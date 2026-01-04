@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>PokeCards</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#1c1c1c;
+  color:white;
+}
+header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:15px;
+  background:#101010;
+}
+h1{
+  color:#ffcb05;
+  font-size:40px;
+  margin:0;
+}
+.controls{
+  display:flex;
+  gap:10px;
+}
+select,input{
+  padding:6px 10px;
+  border-radius:6px;
+  border:none;
+  font-size:14px;
+}
+#cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+  gap:12px;
+  padding:15px;
+}
+.card{
+  background:#2a2a2a;
+  border-radius:8px;
+  padding:8px;
+  border:2px solid #444;
+}
+.card img{width:100%;border-radius:6px}
+.name{font-weight:bold;margin-top:6px}
+.price{margin-top:4px}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>PokeCards</h1>
+  <div class="controls">
+    <input id="search" placeholder="Buscar carta">
+    <select id="sets">
+      <option>Cargando expansiones…</option>
+    </select>
+  </div>
+</header>
+
+<div id="cards"></div>
+
+<script>
+const setsSelect = document.getElementById("sets");
+const cardsDiv = document.getElementById("cards");
+const searchInput = document.getElementById("search");
+
+let allCards=[];
+
+/* CARGAR SETS */
+fetch("/api/sets")
+  .then(r=>r.json())
+  .then(data=>{
+    setsSelect.innerHTML="<option value=''>Selecciona expansión</option>";
+    data.data
+      .sort((a,b)=>new Date(a.releaseDate)-new Date(b.releaseDate))
+      .forEach(s=>{
+        const o=document.createElement("option");
+        o.value=s.id;
+        o.textContent=s.name;
+        setsSelect.appendChild(o);
+      });
+  })
+  .catch(e=>{
+    console.error(e);
+    setsSelect.innerHTML="<option>Error cargando expansiones</option>";
+  });
+
+/* CARGAR CARTAS */
+setsSelect.onchange=async()=>{
+  if(!setsSelect.value) return;
+  cardsDiv.innerHTML="Cargando cartas…";
+  allCards=[];
+  let page=1;
+
+  while(true){
+    const r=await fetch(`/api/cards?setId=${setsSelect.value}&page=${page}`);
+    const d=await r.json();
+    if(!d.data.length) break;
+    allCards.push(...d.data);
+    page++;
+  }
+  render();
+};
+
+function render(){
+  cardsDiv.innerHTML="";
+  const t=searchInput.value.toLowerCase();
+  allCards
+    .filter(c=>c.name.toLowerCase().includes(t))
+    .forEach(c=>{
+      const price=c.tcgplayer?.prices?.normal?.market;
+      const div=document.createElement("div");
+      div.className="card";
+      div.innerHTML=`
+        <img src="${c.images.small}">
+        <div class="name">${c.name}</div>
+        <div>${c.rarity||""}</div>
+        <div class="price">${price?price+" €":"Sin precio"}</div>
+      `;
+      cardsDiv.appendChild(div);
+    });
+}
+
+searchInput.oninput=render;
+</script>
+
+</body>
+</html>
